@@ -6,6 +6,7 @@ Custom Scale Bar item is selected, and adds a creation tool to the Print Layout.
 """
 
 import os
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QIcon, QFont
 from qgis.PyQt.QtWidgets import (
@@ -504,20 +505,14 @@ class CustomScaleBarGuiMetadata(QgsLayoutItemAbstractGuiMetadata):
 
     def createItemWidget(self, item):
         widget = CustomScaleBarWidget(None, item)
-        try:
-            from qgis.PyQt import sip
+        if hasattr(sip, "transferto"):
             sip.transferto(widget, None)
-        except Exception:
-            pass
         return widget
 
     def createItem(self, layout):
         item = CustomScaleBarItem(layout)
-        try:
-            from qgis.PyQt import sip
+        if hasattr(sip, "transferto"):
             sip.transferto(item, None)
-        except Exception:
-            pass
         return item
 
     def newItemAddedToLayout(self, item):

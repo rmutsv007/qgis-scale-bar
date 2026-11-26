@@ -15,6 +15,7 @@ Supports:
 """
 
 import os
+from qgis.PyQt import sip
 from qgis.PyQt.QtCore import Qt, QRectF, QPointF
 from qgis.PyQt.QtGui import (
     QColor,
@@ -30,6 +31,7 @@ from qgis.PyQt.QtXml import QDomDocument, QDomElement
 from qgis.core import (
     Qgis,
     QgsApplication,
+    QgsCsException,
     QgsDistanceArea,
     QgsLayoutItem,
     QgsLayoutItemAbstractMetadata,
@@ -39,6 +41,7 @@ from qgis.core import (
     QgsLayoutMeasurement,
     QgsLayoutPoint,
     QgsLayoutSize,
+    QgsMessageLog,
     QgsPointXY,
     QgsProject,
     QgsReadWriteContext,
@@ -144,22 +147,16 @@ class CustomScaleBarItem(QgsLayoutItem):
     def __init__(self, layout):
         super().__init__(layout)
         CustomScaleBarItem._LIVE_INSTANCES[id(self)] = self
-        try:
-            self.destroyed.connect(
-                lambda obj=None, item_id=id(self): CustomScaleBarItem._LIVE_INSTANCES.pop(
-                    item_id, None
-                )
+        self.destroyed.connect(
+            lambda obj=None, item_id=id(self): CustomScaleBarItem._LIVE_INSTANCES.pop(
+                item_id, None
             )
-        except Exception:
-            pass
+        )
 
         # Disable graphics item pixmap caching so Qt never displays a blank cached pixmap
         # when selection state changes, and disable opaque white background by default
         # (matching standard QGIS Scale Bar items).
-        try:
-            self.setCacheMode(QgsLayoutItem.NoCache)
-        except Exception:
-            pass
+        self.setCacheMode(QgsLayoutItem.NoCache)
         self.setBackgroundEnabled(False)
 
         self._linked_map = None
@@ -242,20 +239,21 @@ class CustomScaleBarItem(QgsLayoutItem):
     def setLinkedMap(self, map_item, auto_fit_stops: bool = False):
         if self._linked_map is map_item and not auto_fit_stops:
             return
-        if self._linked_map is not None:
+        if self._linked_map is not None and not sip.isdeleted(self._linked_map):
             try:
                 self._linked_map.extentChanged.disconnect(self._on_map_changed)
                 self._linked_map.crsChanged.disconnect(self._on_map_changed)
-            except Exception:
-                pass
+            except (TypeError, RuntimeError) as exc:
+                QgsMessageLog.logMessage(
+                    f"Map signal disconnect info: {exc}",
+                    "Custom Scale Bar",
+                    Qgis.Info,
+                )
         self._linked_map = map_item
-        if map_item is not None:
+        if map_item is not None and not sip.isdeleted(map_item):
             self._linked_map_uuid = map_item.uuid()
-            try:
-                map_item.extentChanged.connect(self._on_map_changed)
-                map_item.crsChanged.connect(self._on_map_changed)
-            except Exception:
-                pass
+            map_item.extentChanged.connect(self._on_map_changed)
+            map_item.crsChanged.connect(self._on_map_changed)
             if auto_fit_stops and not self._auto_scaled_once:
                 self._auto_fit_stops_to_map()
         else:
@@ -370,8 +368,12 @@ class CustomScaleBarItem(QgsLayoutItem):
                         else:
                             map_width_mm = map_width_layout
                         return distance_val * (map_width_mm / width_in_target_unit)
-                except Exception:
-                    pass
+                except QgsCsException as exc:
+                    QgsMessageLog.logMessage(
+                        f"Distance measurement fallback: {exc}",
+                        "Custom Scale Bar",
+                        Qgis.Info,
+                    )
 
                 # Fallback to scale denominator
                 scale = map_item.scale()
@@ -827,9 +829,6 @@ class CustomScaleBarMetadata(QgsLayoutItemAbstractMetadata):
 
     def createItem(self, layout):
         item = CustomScaleBarItem(layout)
-        try:
-            from qgis.PyQt import sip
+        if hasattr(sip, "transferto"):
             sip.transferto(item, None)
-        except Exception:
-            pass
         return item

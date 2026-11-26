@@ -8,9 +8,17 @@ or Add Item menu.
 """
 
 import os
+from qgis.PyQt import sip
 from qgis.PyQt.QtGui import QIcon
 from qgis.PyQt.QtWidgets import QAction, QMessageBox
-from qgis.core import QgsApplication, QgsLayoutPoint, QgsLayoutSize, QgsUnitTypes
+from qgis.core import (
+    Qgis,
+    QgsApplication,
+    QgsLayoutPoint,
+    QgsLayoutSize,
+    QgsMessageLog,
+    QgsUnitTypes,
+)
 from qgis.gui import QgsGui
 
 from .scalebar_item import CUSTOM_SCALEBAR_TYPE, CustomScaleBarItem, CustomScaleBarMetadata
@@ -43,11 +51,8 @@ class CustomScaleBarPlugin:
             self.item_metadata = CustomScaleBarMetadata()
             CustomScaleBarPlugin._REGISTERED_METADATA.append(self.item_metadata)
             registry.addLayoutItemType(self.item_metadata)
-            try:
-                from qgis.PyQt import sip
+            if hasattr(sip, "transferto"):
                 sip.transferto(self.item_metadata, None)
-            except Exception:
-                pass
 
         # 2. Register GUI metadata in QgsGui.layoutItemGuiRegistry()
         # This automatically adds "Add Custom Scale Bar" to the Print Layout toolbox & Add Item menu!
@@ -61,11 +66,8 @@ class CustomScaleBarPlugin:
             self.gui_metadata = CustomScaleBarGuiMetadata()
             CustomScaleBarPlugin._REGISTERED_METADATA.append(self.gui_metadata)
             gui_registry.addLayoutItemGuiMetadata(self.gui_metadata)
-            try:
-                from qgis.PyQt import sip
+            if hasattr(sip, "transferto"):
                 sip.transferto(self.gui_metadata, None)
-            except Exception:
-                pass
 
         # 3. Also hook layoutDesignerOpened to add a quick one-click "Quick Add Custom Scale Bar"
         # button to the Print Layout toolbar if the user prefers instant placement.
@@ -82,21 +84,23 @@ class CustomScaleBarPlugin:
 
     def _on_designer_opened(self, designer):
         """When a Print Layout window opens, ensure a quick-add toolbar action is available."""
-        try:
-            win = designer.window()
-            act = QAction(
-                self._icon(),
-                "Quick Add Custom Scale Bar",
-                win,
-            )
-            act.setToolTip(
-                "Insert a Custom Scale Bar (or use 'Add Item -> Add Custom Scale Bar' to draw on layout)"
-            )
-            act.triggered.connect(lambda checked=False, d=designer: self._quick_add_item(d))
-            designer.actionsToolbar().addAction(act)
-            self._designer_actions.append((designer, act))
-        except Exception:
-            pass
+        if designer is None:
+            return
+        win = designer.window()
+        toolbar = designer.actionsToolbar()
+        if win is None or toolbar is None:
+            return
+        act = QAction(
+            self._icon(),
+            "Quick Add Custom Scale Bar",
+            win,
+        )
+        act.setToolTip(
+            "Insert a Custom Scale Bar (or use 'Add Item -> Add Custom Scale Bar' to draw on layout)"
+        )
+        act.triggered.connect(lambda checked=False, d=designer: self._quick_add_item(d))
+        toolbar.addAction(act)
+        self._designer_actions.append((designer, act))
 
     def _quick_add_item(self, designer):
         """Insert a pre-configured Custom Scale Bar onto the current Print Layout."""
@@ -133,14 +137,18 @@ class CustomScaleBarPlugin:
     def unload(self):
         try:
             self.iface.layoutDesignerOpened.disconnect(self._on_designer_opened)
-        except Exception:
-            pass
+        except (TypeError, RuntimeError) as exc:
+            QgsMessageLog.logMessage(
+                f"Failed to disconnect layoutDesignerOpened: {exc}",
+                "Custom Scale Bar",
+                Qgis.Info,
+            )
 
         for designer, act in self._designer_actions:
-            try:
-                designer.actionsToolbar().removeAction(act)
-            except Exception:
-                pass
+            if designer is not None and not sip.isdeleted(designer):
+                toolbar = designer.actionsToolbar()
+                if toolbar is not None and not sip.isdeleted(toolbar):
+                    toolbar.removeAction(act)
         self._designer_actions.clear()
 
         if self.main_action is not None:
