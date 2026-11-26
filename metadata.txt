@@ -1,0 +1,18 @@
+[general]
+name=Custom Scale Bar
+qgisMinimumVersion=3.16
+description=Create customizable scale bars in Print Layout with irregular/custom division breaks, rich left-zero subdivisions, and multiple visual styles.
+version=1.0.0
+author=Passakorn Poonkerd
+email=pussakorn8899@gmail.com
+about=Provides a custom Print Layout item (Custom Scale Bar) that overcomes the equal-interval limitation of standard QGIS scale bars. Supports custom division values (e.g. 0, 50, 100, 250, 500, 1000), flexible left subdivisions before 0 with tick/label control, and multiple visual styles (Alternating, Double Alternating, Hollow, Stepped Scale Line, Scale Line).
+tracker=https://github.com/rmutsv007/qgis-scale-bar/issues
+repository=https://github.com/rmutsv007/qgis-scale-bar
+homepage=https://github.com/rmutsv007/qgis-scale-bar
+hasProcessingProvider=no
+tags=scalebar,layout,print,cartography,scale,subdivisions
+category=Layout
+icon=icon.svg
+experimental=False
+deprecated=False
+license=GPL-2.0-or-later

@@ -1,0 +1,13 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution packages
+*.zip
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
